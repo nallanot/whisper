@@ -90,7 +90,6 @@ services:
       traefik.http.routers.whisper.entrypoints: '${TRAEFIK_ENTRYPOINT:-websecure}'
       traefik.http.routers.whisper.tls: 'true'
       traefik.http.routers.whisper.tls.certresolver: '${TRAEFIK_CERTRESOLVER:-ovhresolver}'
-      traefik.http.routers.whisper.middlewares: '${TRAEFIK_AUTH_MIDDLEWARE:-whisper-auth@file}'
       traefik.http.routers.whisper.service: whisper
       traefik.http.services.whisper.loadbalancer.server.port: '80'
 networks:

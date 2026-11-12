@@ -16,12 +16,11 @@ APP_PORT=8501
 WHISPER_DOMAIN=whisper.allanot.ovh
 TRAEFIK_ENTRYPOINT=websecure
 TRAEFIK_CERTRESOLVER=ovhresolver
-TRAEFIK_AUTH_MIDDLEWARE=whisper-auth@file
 ```
 
 Le port 8501 doit être libre. Gardez le même nom de stack pour conserver ses volumes et remplacer ses anciens conteneurs; ne lancez pas deux variantes en parallèle.
 
-**Authentification :** le label ajoute `whisper-auth@file`. Créez ce middleware dans Traefik suivant la section Authentification ci-dessous, ou remplacez la variable par votre middleware existant. La stack whoami ne permet pas de confirmer qu'un tel middleware existe. Votre publication distante doit recopier ce label. S'il est absent, la route ne sera pas active; si le mécanisme ignore le label, la protection ne sera pas appliquée. Vérifiez la demande d'authentification dans une fenêtre privée avant de téléverser un audio.
+**Authentification :** cette variante reprend les labels du service Odoo fourni et ne référence plus `whisper-auth@file`. L'interface ne possède donc pas d'authentification intégrée. Si votre point d'entrée Traefik n'applique pas déjà une protection globale, toute personne pouvant atteindre l'adresse peut utiliser l'application. Pour ajouter une protection, configurez d'abord un middleware existant et vérifié dans Traefik, puis ajoutez son label; ne référencez pas un middleware inexistant.
 
 Le mécanisme de synchronisation n'a pas été inspecté : vérifiez dans la configuration dynamique générée que le backend est `http://192.168.1.119:8501`, pas une IP de conteneur ni le port 80 de l'hôte. Ne créez pas une deuxième route manuelle si la synchronisation publie déjà celle-ci. Limitez l'accès direct au port 8501 au serveur Traefik avec des règles réseau adaptées à Docker, pour éviter de contourner son authentification.
 
