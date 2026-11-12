@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.env
+*.m4a
+*.mp3
+*.wav
+*.mp4
+*.zip
