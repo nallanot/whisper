@@ -1,0 +1,16 @@
+# Pour Traefik sur un autre hôte : adapter IP, domaine et resolver.
+# Ne pas utiliser en même temps que le routeur Docker whisper.
+http:
+  routers:
+    whisper:
+      rule: "Host(`whisper.allanot.ovh`)"
+      entryPoints: [websecure]
+      service: whisper
+      middlewares: [whisper-auth]
+      tls:
+        certResolver: ovh
+  services:
+    whisper:
+      loadBalancer:
+        servers:
+          - url: "http://IP_UBUNTU_WHISPER:8501"

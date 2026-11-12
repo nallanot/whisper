@@ -41,3 +41,7 @@ Déposez d'abord un enregistrement non sensible de 1 à 2 minutes. Vérifiez la 
 Cette configuration cible Docker Compose (y compris sur un hôte ayant Swarm activé), pas `docker stack deploy`. Ne lancez pas `install.sh` pour ce parcours : Dockhand exécute les initialisations.
 
 Documentation : https://dockhand.pro/manual/
+
+## Accès par Traefik
+
+Voir [TRAEFIK.md](TRAEFIK.md). Pour le même hôte Docker, sélectionnez `compose.traefik.yaml` dans la stack existante. Pour Traefik sur un autre serveur, suivez la variante file provider du guide.

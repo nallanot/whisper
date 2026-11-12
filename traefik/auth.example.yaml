@@ -1,0 +1,8 @@
+# Copier dans le répertoire dynamique surveillé par Traefik.
+# Le fichier usersFile doit exister DANS le conteneur Traefik.
+http:
+  middlewares:
+    whisper-auth:
+      basicAuth:
+        usersFile: /etc/traefik/auth/whisper.htpasswd
+        removeHeader: true
