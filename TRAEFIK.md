@@ -2,6 +2,31 @@
 
 Adresse proposée : **https://whisper.allanot.ovh**. Aucun changement DNS ou déploiement n'est effectué par l'ajout de ces fichiers.
 
+## Serveur Plex : publication distante existante (configuration recommandée)
+
+La stack whoami fournie publie `192.168.1.119:8090:80` avec les labels Traefik et le resolver `ovhresolver`. Pour reprendre ce schéma, choisissez **compose.plex.yaml** dans la stack Git Dockhand existante et activez le build.
+
+La passerelle Whisper publie **192.168.1.119:8501 → port 80** et porte les labels de `whisper.allanot.ovh`. Le port déclaré dans le label reste **80**, comme pour whoami : votre mécanisme de publication distante doit le traduire vers le port publié **8501**. Aucun réseau Docker externe partagé n'est nécessaire. L'application et Ollama restent uniquement sur le réseau interne. La configuration Nginx est intégrée dans une image construite depuis `Dockerfile.gateway`, sans montage relatif à synchroniser sur le serveur.
+
+Variables Dockhand :
+
+```env
+BIND_IP=192.168.1.119
+APP_PORT=8501
+WHISPER_DOMAIN=whisper.allanot.ovh
+TRAEFIK_ENTRYPOINT=websecure
+TRAEFIK_CERTRESOLVER=ovhresolver
+TRAEFIK_AUTH_MIDDLEWARE=whisper-auth@file
+```
+
+Le port 8501 doit être libre. Gardez le même nom de stack pour conserver ses volumes et remplacer ses anciens conteneurs; ne lancez pas deux variantes en parallèle.
+
+**Authentification :** le label ajoute `whisper-auth@file`. Créez ce middleware dans Traefik suivant la section Authentification ci-dessous, ou remplacez la variable par votre middleware existant. La stack whoami ne permet pas de confirmer qu'un tel middleware existe. Votre publication distante doit recopier ce label. S'il est absent, la route ne sera pas active; si le mécanisme ignore le label, la protection ne sera pas appliquée. Vérifiez la demande d'authentification dans une fenêtre privée avant de téléverser un audio.
+
+Le mécanisme de synchronisation n'a pas été inspecté : vérifiez dans la configuration dynamique générée que le backend est `http://192.168.1.119:8501`, pas une IP de conteneur ni le port 80 de l'hôte. Ne créez pas une deuxième route manuelle si la synchronisation publie déjà celle-ci. Limitez l'accès direct au port 8501 au serveur Traefik avec des règles réseau adaptées à Docker, pour éviter de contourner son authentification.
+
+Le DNS de `whisper.allanot.ovh` doit pointer vers l'entrée Traefik comme celui de whoami. Aucun DNS ni serveur n'a été modifié par ce commit.
+
 ## Même hôte Docker
 
 Dans la stack Git Dockhand existante, conservez son nom actuel et changez uniquement le fichier Compose pour **compose.traefik.yaml**. Activez le build et synchronisez le dépôt complet, y compris `traefik/nginx.conf`. Conserver le nom de stack permet de réutiliser les volumes de modèles. Ne créez pas une deuxième stack concurrente.
