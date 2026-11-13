@@ -12,21 +12,29 @@ def chunks(text, limit=6500):
     return [text[i:i + limit] for i in range(0, len(text), limit)]
 
 def ask(text, instruction):
-    response = requests.post(os.getenv("OLLAMA_URL", "http://ollama:11434") + "/api/chat",
-        json={"model": os.getenv("LLM_MODEL", "qwen3:4b"), "stream": False,
-              "think": False, "keep_alive": 0,
-              "options": {"temperature": 0.1, "num_ctx": 8192, "num_predict": 1800},
-              "messages": [{"role": "system", "content": SYSTEM},
-                           {"role": "user", "content": instruction + "\n<SOURCE>\n" + text + "\n</SOURCE>"}]},
-        timeout=(10, 3600))
-    response.raise_for_status()
-    payload = response.json()
-    if payload.get("done_reason") == "length":
-        raise RuntimeError("Réponse trop longue : réduisez la longueur du texte ou augmentez num_predict.")
-    result = payload["message"]["content"].strip()
-    if not result:
-        raise RuntimeError("Le modèle a retourné une réponse vide.")
-    return result
+    # Retry from the full source, never treat a truncated answer as complete.
+    attempts = [(1800, 600), (3000, 450), (3000, 300)]
+    for budget, words in attempts:
+        response = requests.post(os.getenv("OLLAMA_URL", "http://ollama:11434") + "/api/chat",
+            json={"model": os.getenv("LLM_MODEL", "qwen3:4b"), "stream": False,
+                  "think": False, "keep_alive": 0,
+                  "options": {"temperature": 0.1, "num_ctx": 8192, "num_predict": budget},
+                  "messages": [{"role": "system", "content": SYSTEM},
+                               {"role": "user", "content": instruction +
+                                f"\nLimite la réponse à {words} mots maximum, sans répétitions. "
+                                "Privilégie les décisions et les suivis explicites.\n<SOURCE>\n" +
+                                text + "\n</SOURCE>"}]},
+            timeout=(10, 3600))
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("done_reason") == "length":
+            continue
+        result = payload["message"]["content"].strip()
+        if not result:
+            raise RuntimeError("Le modèle a retourné une réponse vide.")
+        return result
+    raise RuntimeError("Le modèle atteint encore sa limite après trois tentatives. "
+                       "La transcription est conservée : téléchargez-la ou relancez seulement le résumé.")
 
 def summarize(text, progress=lambda message: None):
     parts = chunks(text)
@@ -34,7 +42,7 @@ def summarize(text, progress=lambda message: None):
         notes = []
         for index, part in enumerate(parts, 1):
             progress(f"Analyse de la partie {index}/{len(parts)}")
-            notes.append(ask(part, "Extrais les faits essentiels, décisions, propositions, actions, responsables, échéances et points ouverts de cet extrait. Sois concis."))
+            notes.append(ask(part, "Extrais les faits essentiels, décisions, propositions, actions, responsables, échéances et points ouverts de cet extrait en moins de 300 mots."))
         text = "\n\n".join(notes)
         # Réduction hiérarchique pour les rencontres longues.
         for _ in range(6):
@@ -50,3 +58,4 @@ def summarize(text, progress=lambda message: None):
             raise RuntimeError("Rencontre trop longue pour une synthèse unique.")
     progress("Rédaction du compte rendu")
     return ask(text, "Rédige en Markdown : 1. Résumé, 2. Points discutés, 3. Décisions explicites, 4. Tableau des suivis (Action | Responsable | Échéance), 5. Points à clarifier. N'attribue pas de propos à une personne sans preuve dans la source.")
+

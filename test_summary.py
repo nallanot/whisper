@@ -34,5 +34,34 @@ class SummaryTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 summary.ask('source', 'résume')
 
+    def test_length_retries_with_full_source_and_larger_budget(self):
+        def response(reason, content):
+            return types.SimpleNamespace(raise_for_status=lambda: None,
+                json=lambda: {'done_reason': reason, 'message': {'content': content}})
+        with patch.object(summary.requests, 'post', side_effect=[
+                response('length', 'incomplet'), response('stop', 'Résumé complet')]) as post:
+            self.assertEqual(summary.ask('SOURCE ENTIERE', 'résume'), 'Résumé complet')
+            calls = post.call_args_list
+            self.assertEqual([c.kwargs['json']['options']['num_predict'] for c in calls], [1800, 3000])
+            for call in calls:
+                self.assertIn('SOURCE ENTIERE', call.kwargs['json']['messages'][1]['content'])
+                self.assertEqual(call.kwargs['json']['options']['num_ctx'], 8192)
+
+    def test_all_truncated_attempts_are_bounded(self):
+        response = types.SimpleNamespace(raise_for_status=lambda: None,
+            json=lambda: {'done_reason': 'length', 'message': {'content': 'incomplet'}})
+        with patch.object(summary.requests, 'post', return_value=response) as post:
+            with self.assertRaises(RuntimeError):
+                summary.ask('source', 'résume')
+            self.assertEqual(post.call_count, 3)
+
+    def test_http_failure_is_not_retried(self):
+        response = types.SimpleNamespace(raise_for_status=lambda: (_ for _ in ()).throw(RuntimeError('HTTP')))
+        with patch.object(summary.requests, 'post', return_value=response) as post:
+            with self.assertRaisesRegex(RuntimeError, 'HTTP'):
+                summary.ask('source', 'résume')
+            self.assertEqual(post.call_count, 1)
+
 if __name__ == '__main__':
     unittest.main()
+

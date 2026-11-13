@@ -20,6 +20,22 @@ uploaded = st.file_uploader("Enregistrement audio (200 Mo maximum)", type=["m4a"
 language = st.selectbox("Langue de l'enregistrement", ["Français", "Détection automatique", "Anglais"])
 lang = {"Français": "fr", "Détection automatique": "auto", "Anglais": "en"}[language]
 
+with st.expander("Reprendre une transcription déjà enregistrée"):
+    saved_text = st.file_uploader("Transcription UTF-8 (.txt, 5 Mo maximum)", type=["txt"])
+    if st.button("Charger la transcription", disabled=saved_text is None):
+        if saved_text.size > 5 * 1024 * 1024:
+            st.error("Le fichier texte dépasse 5 Mo.")
+        else:
+            try:
+                restored = saved_text.getvalue().decode("utf-8-sig")
+                if not restored.strip():
+                    raise ValueError("La transcription est vide.")
+                st.session_state.transcript = restored
+                st.session_state.pop("summary", None)
+                st.success("Transcription chargée. Cliquez sur Générer le résumé ci-dessous.")
+            except (UnicodeDecodeError, ValueError) as error:
+                st.error(f"Fichier texte invalide : {error}")
+
 if st.button("Transcrire et résumer", type="primary", disabled=uploaded is None):
     lock = processing_lock()
     if not lock.acquire(blocking=False):
@@ -50,6 +66,22 @@ if st.button("Transcrire et résumer", type="primary", disabled=uploaded is None
         finally:
             lock.release()
 
+if "transcript" in st.session_state and st.button("Générer le résumé à partir de la transcription"):
+    lock = processing_lock()
+    if not lock.acquire(blocking=False):
+        st.warning("Un traitement est déjà en cours. Réessayez après sa fin.")
+    else:
+        try:
+            with st.status("Génération du résumé…", expanded=True) as status:
+                result = summarize(st.session_state.transcript,
+                                   lambda message: status.update(label=message))
+                st.session_state.summary = result
+                status.update(label="Compte rendu prêt", state="complete", expanded=False)
+        except Exception as error:
+            st.error(str(error))
+        finally:
+            lock.release()
+
 if "summary" in st.session_state:
     st.markdown(st.session_state.summary)
     st.download_button("Télécharger le compte rendu (.md)", st.session_state.summary, "compte-rendu.md", "text/markdown")
@@ -62,3 +94,4 @@ if "transcript" in st.session_state:
         st.session_state.pop("transcript", None)
         st.rerun()
 st.caption("Les résultats restent dans la session : téléchargez-les avant de fermer la page. Aucun historique permanent n'est créé. Pas d'identification automatique des intervenants.")
+
